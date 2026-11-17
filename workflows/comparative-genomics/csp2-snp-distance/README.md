@@ -77,20 +77,30 @@ not collect them.
 
 ## Validation
 
-The tests run two cases, both from the soil isolates in the CSP2 test data. One names Sample_A as
+The tests run three cases, all from the soil isolates in the CSP2 test data. One names Sample_A as
 the reference for three isolates with the tree switched off; its expected outputs come from
 running upstream's own Nextflow pipeline on the same three assemblies, and they agree with the
 published 15-isolate values for those isolates, apart from SNPs_Cocalled, which depends on the
-size of the site set. The other runs all 15 isolates with every setting
-at its default, so RefChooser picks the reference and the tree is built, and compares against the
-expected outputs CSP2's authors publish for that run.
+size of the site set. One names both Sample_A and Sample_B as references for the same three
+isolates, with expected outputs from upstream's pipeline run with both references named. The
+third runs all 15 isolates with every setting at its default, so RefChooser picks the reference
+and the tree is built, and compares against the expected outputs CSP2's authors publish for that
+run.
 
-In both cases the snpdiffs, summary tables, reference screening, pairwise distances, distance
+In all three cases the snpdiffs, summary tables, reference screening, pairwise distances, distance
 matrices, SNP list and SNP alignment, raw and preserved, are checked on their content. Assembly
 paths are left out of those checks. CSP2 writes the screening rows and the preserved SNP list in
 an order that changes from run to run, so they are sorted before comparing, and the preserved
 alignment is checked by size and per-isolate base counts. Each k-mer count may be one above the
 published value, because CSP2 counts an extra k-mer when its first k-mer counting attempt comes
 back empty on a host short of memory; every other value is checked exactly. The tree comes from a
-newer IQ-TREE than upstream's, so only its shape is checked. Choosing more than one reference has no published
-expected output and is not tested.
+newer IQ-TREE than upstream's, so only its shape is checked.
+
+In the two-reference case the results for each reference match upstream's, although upstream
+aligns the two references with each other once and this workflow aligns both directions. The
+alignment of Sample_A against Sample_B is checked only on isolate IDs and assembly metrics: MUMmer
+`dnadiff` returned it two ways in repeated runs on one machine (one extra 228 bp alignment without
+SNPs, shorter than the minimum alignment length), which leaves the SNP results unchanged.
+Upstream's pipeline could not finish that run on the 8 GB test host until the k-mer counter's
+memory override was set, for the reason given under Requirements; the override does not change
+its results.

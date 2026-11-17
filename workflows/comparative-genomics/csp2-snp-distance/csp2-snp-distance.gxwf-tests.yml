@@ -27,8 +27,21 @@
 #   k-mer when the host is short of memory, and nothing else in the output changes when that happens.
 #   The snpdiffs header regexes and Raw MUMmer summary rows allow it directly; the Reference screening
 #   diff gets lines_diff of two per row, and anchored per-row regexes pin every other column exactly.
-# Not covered by any case: more than one reference (Number of references to select > 1, or several
-# Reference isolate IDs). Upstream publishes no expected output for that path.
+#
+# snp-soil-3-isolates-two-references has no published oracle either. Its Sample_B files under
+# test-data/3-isolates-ref-b/ come from upstream's Nextflow pipeline (CSP2.nf --runmode snp --ref_id
+# Sample_A,Sample_B --notree) in the same image on the same three assemblies. That run's Sample_A
+# outputs equal the files under test-data/3-isolates/ (the preserved SNP list after sorting), so the
+# case reuses them. The run was made with RQCMEM=3000 in the environment: without it CSP2's k-mer
+# counter got a 29 MB heap on the 8 GB test host and the pipeline stopped after ten attempts. RQCMEM
+# only sizes the Java heap.
+# - Upstream aligns the two references with each other once (Sample_A as the query) and reads that
+#   alignment for both. This workflow also aligns Sample_B against Sample_A, so it has four snpdiffs
+#   and four summary rows where upstream has three; the per-reference outputs are the same.
+# - Sample_A:Sample_B is asserted on isolate IDs and assembly metrics only. dnadiff returned that
+#   alignment with or without one 228 bp alignment in repeated runs on one machine.
+# Not covered by any case: Number of references to select > 1, where RefChooser picks several
+# references. Upstream publishes no expected output for that path.
 - doc: 'snp-soil-3-isolates-named-reference: CSP2 snp mode on three of the Soil_Analysis assemblies (Sample_A, Sample_B, Sample_D) with Sample_A named as the reference and the tree step switched off. Exercises the user-supplied reference path (RefChooser skipped) and the Build phylogenetic tree = false branch in two alignments instead of fourteen. Expected outputs come from upstream''s own Nextflow pipeline on the same three assemblies.'
   job:
     Query assemblies:
@@ -195,6 +208,243 @@
               expression: '(?:^|\n)>Sample_B\n(?=(?:[^A>]*A){13}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){11}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){8}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){7}[^T>]*(?:>|\Z))'
           - has_text_matching:
               expression: '(?:^|\n)>Sample_D\n(?=(?:[^A>]*A){8}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){10}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){12}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){9}[^T>]*(?:>|\Z))'
+- doc: 'snp-soil-3-isolates-two-references: CSP2 snp mode on the same three Soil_Analysis assemblies (Sample_A, Sample_B, Sample_D) with Sample_A and Sample_B both named as references and the tree step switched off. Exercises more than one reference: Sample_D is aligned against each reference, the two references against each other in both directions, and the SNP analysis runs once per reference. Expected outputs for Sample_B come from upstream''s own Nextflow pipeline with both references named; those for Sample_A are the single-reference files, which that upstream run reproduces. The Sample_A against Sample_B alignment is checked on isolate IDs and assembly metrics only, because MUMmer dnadiff returned it two ways in repeated runs (one extra 228 bp alignment without SNPs, shorter than the minimum alignment length), which leaves the per-reference results unchanged.'
+  job:
+    Query assemblies:
+      class: Collection
+      collection_type: list
+      elements:
+      - class: File
+        identifier: Sample_A
+        location: https://raw.githubusercontent.com/microbial-bioinformatics/CSP2_TestData/61b1f790417ed2a2a08390d432b03effabbd66e2/assets/SNP/Sample_A.fasta
+        filetype: fasta
+        hashes:
+        - hash_function: SHA-1
+          hash_value: 9ede9ea9addfd9233453fe05200d63b2e63f6c25
+      - class: File
+        identifier: Sample_B
+        location: https://raw.githubusercontent.com/microbial-bioinformatics/CSP2_TestData/61b1f790417ed2a2a08390d432b03effabbd66e2/assets/SNP/Sample_B.fasta
+        filetype: fasta
+        hashes:
+        - hash_function: SHA-1
+          hash_value: d5fdde41045a6393adb978d8f1d0f689d1a08471
+      - class: File
+        identifier: Sample_D
+        location: https://raw.githubusercontent.com/microbial-bioinformatics/CSP2_TestData/61b1f790417ed2a2a08390d432b03effabbd66e2/assets/SNP/Sample_D.fasta
+        filetype: fasta
+        hashes:
+        - hash_function: SHA-1
+          hash_value: 2239f6fdcc72a133c45d914c8b91d8e10ba4a393
+    Reference isolate IDs: Sample_A,Sample_B
+    Build phylogenetic tree: false
+  outputs:
+    Reference IDs:
+      asserts:
+      - has_line:
+          line: Sample_A
+      - has_line:
+          line: Sample_B
+      - has_n_lines:
+          n: 2
+    SNPDiffs:
+      class: Collection
+      element_count: 4
+      element_tests:
+        Sample_B:Sample_A:
+          file: test-data/snpdiffs/Sample_B__vs__Sample_A.snpdiffs
+          compare: diff
+          lines_diff: 2
+          asserts:
+          - has_line_matching:
+              expression: \#\tQuery_ID:Sample_B\tQuery_Assembly:[^\t]+\tQuery_Contig_Count:40\tQuery_Assembly_Bases:4631086\tQuery_N50:285283\tQuery_N90:87355\tQuery_L50:6\tQuery_L90:17\tQuery_SHA256:2486ab6c17c1c7997a5707111aa8e2cac41c578382aff413fa66086a31fbde38\tReference_ID:Sample_A\tReference_Assembly:[^\t]+\tReference_Contig_Count:50\tReference_Assembly_Bases:4626313\tReference_N50:285283\tReference_N90:80168\tReference_L50:7\tReference_L90:20\tReference_SHA256:dae2379030db9c465040198216d2976ef11fcea1a5739c2dc47950253842bd4b\tSNPs:37\tReference_Percent_Aligned:99\.99\tQuery_Percent_Aligned:99\.94\tMedian_Percent_Identity:100\.00\tMedian_Alignment_Length:50330\.00\tKmer_Similarity:99\.87\tShared_Kmers:461602[01]\tReference_Unique_Kmers:151[01]\tQuery_Unique_Kmers:456[56]\tReference_Breakpoints:42\tQuery_Breakpoints:85\tReference_Relocations:0\tQuery_Relocations:0\tReference_Translocations:3\tQuery_Translocations:12\tReference_Inversions:0\tQuery_Inversions:0\tReference_Insertions:10\tQuery_Insertions:51\tReference_Tandem:0\tQuery_Tandem:1\tIndels:2\tInvalid:0\tgSNPs:35\tgIndels:2
+        Sample_D:Sample_A:
+          file: test-data/snpdiffs/Sample_D__vs__Sample_A.snpdiffs
+          compare: diff
+          lines_diff: 2
+          asserts:
+          - has_line_matching:
+              expression: \#\tQuery_ID:Sample_D\tQuery_Assembly:[^\t]+\tQuery_Contig_Count:55\tQuery_Assembly_Bases:4627990\tQuery_N50:238061\tQuery_N90:54649\tQuery_L50:7\tQuery_L90:23\tQuery_SHA256:0a8824d9ecda9632b817d421c082e8bf87b613a8032e6e41ce02fb8a8167d8c0\tReference_ID:Sample_A\tReference_Assembly:[^\t]+\tReference_Contig_Count:50\tReference_Assembly_Bases:4626313\tReference_N50:285283\tReference_N90:80168\tReference_L50:7\tReference_L90:20\tReference_SHA256:dae2379030db9c465040198216d2976ef11fcea1a5739c2dc47950253842bd4b\tSNPs:10\tReference_Percent_Aligned:99\.99\tQuery_Percent_Aligned:99\.97\tMedian_Percent_Identity:100\.00\tMedian_Alignment_Length:40058\.00\tKmer_Similarity:99\.92\tShared_Kmers:461609[12]\tReference_Unique_Kmers:(?:1439|1440)\tQuery_Unique_Kmers:247[45]\tReference_Breakpoints:51\tQuery_Breakpoints:52\tReference_Relocations:0\tQuery_Relocations:0\tReference_Translocations:13\tQuery_Translocations:5\tReference_Inversions:0\tQuery_Inversions:0\tReference_Insertions:21\tQuery_Insertions:30\tReference_Tandem:0\tQuery_Tandem:0\tIndels:11\tInvalid:0\tgSNPs:10\tgIndels:3
+        Sample_D:Sample_B:
+          file: test-data/3-isolates-ref-b/Sample_D__vs__Sample_B.snpdiffs
+          compare: diff
+          lines_diff: 2
+          asserts:
+          - has_line_matching:
+              expression: '\#\tQuery_ID:Sample_D\tQuery_Assembly:[^\t]+\tQuery_Contig_Count:55\tQuery_Assembly_Bases:4627990\tQuery_N50:238061\tQuery_N90:54649\tQuery_L50:7\tQuery_L90:23\tQuery_SHA256:0a8824d9ecda9632b817d421c082e8bf87b613a8032e6e41ce02fb8a8167d8c0\tReference_ID:Sample_B\tReference_Assembly:[^\t]+\tReference_Contig_Count:40\tReference_Assembly_Bases:4631086\tReference_N50:285283\tReference_N90:87355\tReference_L50:6\tReference_L90:17\tReference_SHA256:2486ab6c17c1c7997a5707111aa8e2cac41c578382aff413fa66086a31fbde38\tSNPs:37\tReference_Percent_Aligned:99\.96\tQuery_Percent_Aligned:99\.99\tMedian_Percent_Identity:100\.00\tMedian_Alignment_Length:35826\.00\tKmer_Similarity:99\.88\tShared_Kmers:461672[56]\tReference_Unique_Kmers:386[01]\tQuery_Unique_Kmers:184[01]\tReference_Breakpoints:80\tQuery_Breakpoints:39\tReference_Relocations:0\tQuery_Relocations:0\tReference_Translocations:18\tQuery_Translocations:3\tReference_Inversions:0\tQuery_Inversions:0\tReference_Insertions:46\tQuery_Insertions:8\tReference_Tandem:0\tQuery_Tandem:0\tIndels:5\tInvalid:0\tgSNPs:35\tgIndels:3'
+        Sample_A:Sample_B:
+          asserts:
+          - has_line_matching:
+              expression: '\#\tQuery_ID:Sample_A\tQuery_Assembly:[^\t]+\tQuery_Contig_Count:50\tQuery_Assembly_Bases:4626313\tQuery_N50:285283\tQuery_N90:80168\tQuery_L50:7\tQuery_L90:20\tQuery_SHA256:dae2379030db9c465040198216d2976ef11fcea1a5739c2dc47950253842bd4b\tReference_ID:Sample_B\tReference_Assembly:[^\t]+\tReference_Contig_Count:40\tReference_Assembly_Bases:4631086\tReference_N50:285283\tReference_N90:87355\tReference_L50:6\tReference_L90:17\tReference_SHA256:2486ab6c17c1c7997a5707111aa8e2cac41c578382aff413fa66086a31fbde38\tSNPs:\d+\t.+'
+    Raw MUMmer summary:
+      asserts:
+      - has_n_lines:
+          n: 5
+      - has_line:
+          line: "SNPDiffs_File\tQuery_ID\tQuery_Assembly\tQuery_Contig_Count\tQuery_Assembly_Bases\tQuery_N50\tQuery_N90\tQuery_L50\tQuery_L90\tQuery_SHA256\tReference_ID\tReference_Assembly\tReference_Contig_Count\tReference_Assembly_Bases\tReference_N50\tReference_N90\tReference_L50\tReference_L90\tReference_SHA256\tSNPs\tReference_Percent_Aligned\tQuery_Percent_Aligned\tMedian_Percent_Identity\tMedian_Alignment_Length\tKmer_Similarity\tShared_Kmers\tReference_Unique_Kmers\tQuery_Unique_Kmers\tReference_Breakpoints\tQuery_Breakpoints\tReference_Relocations\tQuery_Relocations\tReference_Translocations\tQuery_Translocations\tReference_Inversions\tQuery_Inversions\tReference_Insertions\tQuery_Insertions\tReference_Tandem\tQuery_Tandem\tIndels\tInvalid\tgSNPs\tgIndels"
+      - has_line_matching:
+          expression: '[^\t]+\tSample_B\t[^\t]+\t40\t4631086\t285283\t87355\t6\t17\t2486ab6c17c1c7997a5707111aa8e2cac41c578382aff413fa66086a31fbde38\tSample_A\t[^\t]+\t50\t4626313\t285283\t80168\t7\t20\tdae2379030db9c465040198216d2976ef11fcea1a5739c2dc47950253842bd4b\t37\t99\.99\t99\.94\t100\.00\t50330\.00\t99\.87\t461602[01]\t151[01]\t456[56]\t42\t85\t0\t0\t3\t12\t0\t0\t10\t51\t0\t1\t2\t0\t35\t2'
+      - has_line_matching:
+          expression: '[^\t]+\tSample_D\t[^\t]+\t55\t4627990\t238061\t54649\t7\t23\t0a8824d9ecda9632b817d421c082e8bf87b613a8032e6e41ce02fb8a8167d8c0\tSample_A\t[^\t]+\t50\t4626313\t285283\t80168\t7\t20\tdae2379030db9c465040198216d2976ef11fcea1a5739c2dc47950253842bd4b\t10\t99\.99\t99\.97\t100\.00\t40058\.00\t99\.92\t461609[12]\t(?:1439|1440)\t247[45]\t51\t52\t0\t0\t13\t5\t0\t0\t21\t30\t0\t0\t11\t0\t10\t3'
+      - has_line_matching:
+          expression: '[^\t]+\tSample_D\t[^\t]+\t55\t4627990\t238061\t54649\t7\t23\t0a8824d9ecda9632b817d421c082e8bf87b613a8032e6e41ce02fb8a8167d8c0\tSample_B\t[^\t]+\t40\t4631086\t285283\t87355\t6\t17\t2486ab6c17c1c7997a5707111aa8e2cac41c578382aff413fa66086a31fbde38\t37\t99\.96\t99\.99\t100\.00\t35826\.00\t99\.88\t461672[56]\t386[01]\t184[01]\t80\t39\t0\t0\t18\t3\t0\t0\t46\t8\t0\t0\t5\t0\t35\t3'
+      - has_line_matching:
+          expression: '[^\t]+\tSample_A\t[^\t]+\t50\t4626313\t285283\t80168\t7\t20\tdae2379030db9c465040198216d2976ef11fcea1a5739c2dc47950253842bd4b\tSample_B\t[^\t]+\t40\t4631086\t285283\t87355\t6\t17\t2486ab6c17c1c7997a5707111aa8e2cac41c578382aff413fa66086a31fbde38\t\d+\t.+'
+    Isolate data:
+      asserts:
+      - has_n_lines:
+          n: 4
+      - has_line:
+          line: "Isolate_ID\tIsolate_Type\tAssembly_Path\tContig_Count\tAssembly_Bases\tN50\tN90\tL50\tL90\tSHA256"
+      - has_line_matching:
+          expression: 'Sample_A\tReference\t[^\t]+\t50\t4626313\t285283\t80168\t7\t20\tdae2379030db9c465040198216d2976ef11fcea1a5739c2dc47950253842bd4b'
+      - has_line_matching:
+          expression: 'Sample_B\tReference\t[^\t]+\t40\t4631086\t285283\t87355\t6\t17\t2486ab6c17c1c7997a5707111aa8e2cac41c578382aff413fa66086a31fbde38'
+      - has_line_matching:
+          expression: 'Sample_D\tQuery\t[^\t]+\t55\t4627990\t238061\t54649\t7\t23\t0a8824d9ecda9632b817d421c082e8bf87b613a8032e6e41ce02fb8a8167d8c0'
+    Reference screening:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/Reference_Screening.tsv
+          compare: diff
+          sort: true
+          lines_diff: 4
+          asserts:
+          - has_n_lines:
+              n: 3
+          - has_line:
+              line: "Query_ID\tReference_ID\tScreen_Category\tCSP2_Screen_SNPs\tQuery_Percent_Aligned\tReference_Percent_Aligned\tQuery_Contigs\tQuery_Bases\tReference_Contigs\tReference_Bases\tRaw_SNPs\tPurged_Length\tPurged_Identity\tPurged_LengthIdentity\tPurged_Invalid\tPurged_Indel\tPurged_Duplicate\tPurged_Het\tPurged_Density\tFiltered_Query_Edge\tFiltered_Ref_Edge\tFiltered_Both_Edge\tKmer_Similarity\tShared_Kmers\tQuery_Unique_Kmers\tReference_Unique_Kmers\tMUMmer_gSNPs\tMUMmer_gIndels"
+          - has_line_matching:
+              expression: 'Sample_D\tSample_A\tPass\t10\t99\.85\t99\.89\t55\t4627990\t50\t4626313\t10\t0\t0\t0\t0\t11\t0\t0\t0\t0\t0\t0\t99\.92\t461609[12]\t247[45]\t(?:1439|1440)\t10\t3'
+          - has_line_matching:
+              expression: 'Sample_B\tSample_A\tPass\t34\t99\.80\t99\.91\t40\t4631086\t50\t4626313\t37\t0\t0\t0\t0\t2\t0\t0\t2\t0\t0\t1\t99\.87\t461602[01]\t456[56]\t151[01]\t35\t2'
+        Sample_B:
+          file: test-data/3-isolates-ref-b/Reference_Screening.tsv
+          compare: diff
+          sort: true
+          lines_diff: 4
+          asserts:
+          - has_n_lines:
+              n: 3
+          - has_line:
+              line: "Query_ID\tReference_ID\tScreen_Category\tCSP2_Screen_SNPs\tQuery_Percent_Aligned\tReference_Percent_Aligned\tQuery_Contigs\tQuery_Bases\tReference_Contigs\tReference_Bases\tRaw_SNPs\tPurged_Length\tPurged_Identity\tPurged_LengthIdentity\tPurged_Invalid\tPurged_Indel\tPurged_Duplicate\tPurged_Het\tPurged_Density\tFiltered_Query_Edge\tFiltered_Ref_Edge\tFiltered_Both_Edge\tKmer_Similarity\tShared_Kmers\tQuery_Unique_Kmers\tReference_Unique_Kmers\tMUMmer_gSNPs\tMUMmer_gIndels"
+          - has_line_matching:
+              expression: 'Sample_D\tSample_B\tPass\t34\t99\.91\t99\.84\t55\t4627990\t40\t4631086\t37\t0\t0\t0\t0\t5\t0\t0\t2\t0\t0\t1\t99\.88\t461672[56]\t184[01]\t386[01]\t35\t3'
+          - has_line_matching:
+              expression: 'Sample_A\tSample_B\tPass\t34\t[0-9.]+\t[0-9.]+\t50\t4626313\t40\t4631086\t.+'
+    Pairwise SNP distances:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/snp_distance_pairwise.tsv
+          compare: diff
+        Sample_B:
+          file: test-data/3-isolates-ref-b/snp_distance_pairwise.tsv
+          compare: diff
+    Preserved pairwise SNP distances:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/snp_distance_pairwise_preserved.tsv
+          compare: diff
+        Sample_B:
+          file: test-data/3-isolates-ref-b/snp_distance_pairwise_preserved.tsv
+          compare: diff
+    SNP distance matrix:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/snp_distance_matrix.tsv
+          compare: diff
+        Sample_B:
+          file: test-data/3-isolates-ref-b/snp_distance_matrix.tsv
+          compare: diff
+    Preserved SNP distance matrix:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/snp_distance_matrix_preserved.tsv
+          compare: diff
+        Sample_B:
+          file: test-data/3-isolates-ref-b/snp_distance_matrix_preserved.tsv
+          compare: diff
+    SNP list:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/snplist.txt
+          compare: diff
+        Sample_B:
+          file: test-data/3-isolates-ref-b/snplist.txt
+          compare: diff
+    SNP alignment:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/snpma.fasta
+          compare: diff
+        Sample_B:
+          file: test-data/3-isolates-ref-b/snpma.fasta
+          compare: diff
+    Preserved SNP list:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          file: test-data/3-isolates/snplist_preserved.txt
+          compare: diff
+          sort: true
+        Sample_B:
+          file: test-data/3-isolates-ref-b/snplist_preserved.txt
+          compare: diff
+          sort: true
+    Preserved SNP alignment:
+      class: Collection
+      element_count: 2
+      element_tests:
+        Sample_A:
+          asserts:
+          - has_n_lines:
+              n: 6
+          - has_size:
+              size: 150
+          - has_line:
+              line: '>Sample_A'
+          - has_line:
+              line: '>Sample_B'
+          - has_line:
+              line: '>Sample_D'
+          - has_text_matching:
+              expression: '(?:^|\n)>Sample_A\n(?=(?:[^A>]*A){5}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){9}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){15}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){10}[^T>]*(?:>|\Z))'
+          - has_text_matching:
+              expression: '(?:^|\n)>Sample_B\n(?=(?:[^A>]*A){13}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){11}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){8}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){7}[^T>]*(?:>|\Z))'
+          - has_text_matching:
+              expression: '(?:^|\n)>Sample_D\n(?=(?:[^A>]*A){8}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){10}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){12}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){9}[^T>]*(?:>|\Z))'
+        Sample_B:
+          asserts:
+          - has_n_lines:
+              n: 6
+          - has_size:
+              size: 150
+          - has_line:
+              line: '>Sample_A'
+          - has_line:
+              line: '>Sample_B'
+          - has_line:
+              line: '>Sample_D'
+          - has_text_matching:
+              expression: '(?:^|\n)>Sample_A\n(?=(?:[^A>]*A){4}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){9}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){15}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){11}[^T>]*(?:>|\Z))'
+          - has_text_matching:
+              expression: '(?:^|\n)>Sample_B\n(?=(?:[^A>]*A){13}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){10}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){9}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){7}[^T>]*(?:>|\Z))'
+          - has_text_matching:
+              expression: '(?:^|\n)>Sample_D\n(?=(?:[^A>]*A){7}[^A>]*(?:>|\Z))(?=(?:[^C>]*C){10}[^C>]*(?:>|\Z))(?=(?:[^G>]*G){12}[^G>]*(?:>|\Z))(?=(?:[^T>]*T){10}[^T>]*(?:>|\Z))'
 - doc: 'snp-soil-15-isolates-refchooser: CSP2 snp mode on the 15 Soil_Analysis assemblies with every parameter left at its workflow default and no reference named, so RefChooser picks one reference. Reproduces the upstream expected run (n_ref = 1, reference Sample_A, max_missing = 50) and compares snpdiffs, screening, SNP lists, SNP alignments and SNP distances, raw and preserved, with the upstream expected outputs. Covers RefChooser and the tree step.'
   job:
     Query assemblies:
