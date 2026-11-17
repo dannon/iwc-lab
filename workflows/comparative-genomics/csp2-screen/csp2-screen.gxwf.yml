@@ -289,7 +289,7 @@ steps:
     run:
       class: GalaxyUserTool
       id: csp2_screen_snpdiffs
-      version: 0.1.0
+      version: 0.1.1
       name: CSP2 snpdiffs screen
       description: screen each query against its reference from a set of CSP2 snpdiffs files and report filtered SNP counts
       container: cfsanbiostatistics/csp2:v.0.9.7.8-galaxy
